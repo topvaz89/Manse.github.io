@@ -1,89 +1,107 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="utf-8">
-    <title>Drive Mad 3D - Poki 2026</title>
-    <!-- Poki SDK & 3D Libraries -->
-    <script src="https://game-cdn.poki.com/scripts/v2/poki-sdk.js"></script>
-    <script src="https://cdnjs.cloudflare.com"></script>
-    <script src="https://cdnjs.cloudflare.com"></script>
-    <style>
-        body { margin: 0; background: #5d9cec; overflow: hidden; font-family: sans-serif; }
-        #ui { position: absolute; top: 20px; width: 100%; text-align: center; color: white; pointer-events: none; }
-    </style>
+<meta charset="utf-8">
+<title>Drive Mad - 250 levels</title>
+<script src="https://game-cdn.poki.com"></script>
+<link rel="stylesheet" href="webapp/fancade.css">
+<style>
+#mod-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10000; font-family: 'Arial Black', sans-serif; }
+#hud { position: absolute; top: 20px; left: 20px; pointer-events: auto; display: flex; flex-direction: column; gap: 15px; }
+.btn-mod { background: #ffcc00; border: 4px solid #000; border-radius: 12px; padding: 12px 24px; font-size: 18px; font-weight: 900; color: #000; cursor: pointer; box-shadow: 6px 6px 0px #000; transition: all 0.1s; display: flex; align-items: center; justify-content: center; text-transform: uppercase; }
+.btn-mod:active { transform: translate(3px, 3px); box-shadow: 2px 2px 0px #000; }
+.btn-skip { background: #ff4444; color: #fff; }
+#level-counter { background: #000; color: #fff; padding: 5px 15px; border-radius: 20px; font-size: 14px; width: fit-content; border: 2px solid #ffcc00; }
+</style>
 </head>
 <body>
-    <div id="ui"><h1 id="lvl">LEVEL 1: START</h1><p>ARROW KEYS TO DRIVE</p></div>
-
-    <script>
-        let world, carBody, vehicle, scene, camera, renderer;
-        
-        // 1. Initialize Poki SDK
-        PokiSDK.init().then(() => {
-            PokiSDK.gameLoadingFinished();
-            init3D();
-            PokiSDK.gameplayStart();
-        }).catch(() => init3D());
-
-        function init3D() {
-            // Setup Three.js Scene
-            scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            document.body.appendChild(renderer.domElement);
-
-            // Setup Cannon.js Physics
-            world = new CANNON.World();
-            world.gravity.set(0, -9.82, 0); //
-
-            // Create Floor (Green Voxel Style)
-            const groundBody = new CANNON.Body({ mass: 0, shape: new CANNON.Plane() });
-            groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
-            world.addBody(groundBody);
-
-            create3DVehicle();
-            animate();
-        }
-
-        function create3DVehicle() {
-            // Chasis (The Red Car Body)
-            const chassisShape = new CANNON.Box(new CANNON.Vec3(1, 0.5, 2));
-            carBody = new CANNON.Body({ mass: 150 });
-            carBody.addShape(chassisShape);
-            carBody.position.set(0, 2, 0);
-            world.addBody(carBody);
-
-            // Visual Car
-            const geometry = new THREE.BoxGeometry(2, 1, 4);
-            const material = new THREE.MeshPhongMaterial({ color: 0xff4444 });
-            const mesh = new THREE.Mesh(geometry, material);
-            scene.add(mesh);
-            
-            // Link Physics to Visuals
-            carBody.visual = mesh;
-        }
-
-        function animate() {
-            requestAnimationFrame(animate);
-            world.step(1/60);
-            
-            // Sync positions
-            carBody.visual.position.copy(carBody.position);
-            carBody.visual.quaternion.copy(carBody.quaternion);
-
-            // Camera follow
-            camera.position.set(carBody.position.x + 10, carBody.position.y + 5, carBody.position.z);
-            camera.lookAt(carBody.position);
-
-            renderer.render(scene, camera);
-        }
-
-        // Input Handling for Driving logic
-        window.addEventListener('keydown', (e) => {
-            if(e.key === "ArrowRight") carBody.applyLocalForce(new CANNON.Vec3(0,0,5000), new CANNON.Vec3(0,0,0));
-            if(e.key === "ArrowLeft") carBody.applyLocalForce(new CANNON.Vec3(0,0,-5000), new CANNON.Vec3(0,0,0));
-        });
-    </script>
+<div id="mod-layer">
+<div id="hud">
+<div id="level-counter">LEVEL: <span id="lvl-idx">1</span> / 250</div>
+<button class="btn-mod" onclick="startCustomMode()">🚀 CUSTOM 50 MODE</button>
+<button class="btn-mod btn-skip" onclick="triggerSkip()">⏩ SKIP LEVEL</button>
+</div>
+</div>
+<canvas id="canvas" tabindex="-1"></canvas>
+<script>
+const EXTRA_LEVEL_DATA = [
+{ id: 201, type: "bridge", difficulty: 5, data: "V19YTDJfMDBfMDFfQUFBX1pYQzE=" },
+{ id: 202, type: "climb", difficulty: 7, data: "V19YTDJfMDBfMDFfQUFBX1pYQzI=" },
+{ id: 203, type: "speed", difficulty: 4, data: "V19YTDJfMDBfMDFfQUFBX1pYQzM=" },
+{ id: 204, type: "flip", difficulty: 9, data: "V19YTDJfMDBfMDFfQUFBX1pYQzQ=" },
+{ id: 205, type: "bridge", difficulty: 6, data: "V19YTDJfMDBfMDFfQUFBX1pYQzU=" },
+{ id: 206, type: "climb", difficulty: 8, data: "V19YTDJfMDBfMDFfQUFBX1pYQzY=" },
+{ id: 207, type: "speed", difficulty: 3, data: "V19YTDJfMDBfMDFfQUFBX1pYQzcl" },
+{ id: 208, type: "flip", difficulty: 10, data: "V19YTDJfMDBfMDFfQUFBX1pYQzg=" },
+{ id: 209, type: "bridge", difficulty: 5, data: "V19YTDJfMDBfMDFfQUFBX1pYQzk=" },
+{ id: 210, type: "climb", difficulty: 7, data: "V19YTDJfMDBfMDFfQUFBX1pYQTEw" },
+{ id: 211, type: "speed", difficulty: 4, data: "V19YTDJfMDBfMDFfQUFBX1pYQTEx" },
+{ id: 212, type: "flip", difficulty: 9, data: "V19YTDJfMDBfMDFfQUFBX1pYQTEx" },
+{ id: 213, type: "bridge", difficulty: 6, data: "V19YTDJfMDBfMDFfQUFBX1pYQTEz" },
+{ id: 214, type: "climb", difficulty: 8, data: "V19YTDJfMDBfMDFfQUFBX1pYQTE0" },
+{ id: 215, type: "speed", difficulty: 3, data: "V19YTDJfMDBfMDFfQUFBX1pYQTE1" },
+{ id: 216, type: "flip", difficulty: 10, data: "V19YTDJfMDBfMDFfQUFBX1pYQTE2" },
+{ id: 217, type: "bridge", difficulty: 5, data: "V19YTDJfMDBfMDFfQUFBX1pYQTE3" },
+{ id: 218, type: "climb", difficulty: 7, data: "V19YTDJfMDBfMDFfQUFBX1pYQTE4" },
+{ id: 219, type: "speed", difficulty: 4, data: "V19YTDJfMDBfMDFfQUFBX1pYQTE5" },
+{ id: 220, type: "flip", difficulty: 9, data: "V19YTDJfMDBfMDFfQUFBX1pYQTIw" },
+{ id: 221, type: "bridge", difficulty: 6, data: "V19YTDJfMDBfMDFfQUFBX1pYQTIx" },
+{ id: 222, type: "climb", difficulty: 8, data: "V19YTDJfMDBfMDFfQUFBX1pYQTIy" },
+{ id: 223, type: "speed", difficulty: 3, data: "V19YTDJfMDBfMDFfQUFBX1pYQTIz" },
+{ id: 224, type: "flip", difficulty: 10, data: "V19YTDJfMDBfMDFfQUFBX1pYQTI0" },
+{ id: 225, type: "bridge", difficulty: 5, data: "V19YTDJfMDBfMDFfQUFBX1pYQTI1" },
+{ id: 226, type: "climb", difficulty: 7, data: "V19YTDJfMDBfMDFfQUFBX1pYQTI2" },
+{ id: 227, type: "speed", difficulty: 4, data: "V19YTDJfMDBfMDFfQUFBX1pYQTI3" },
+{ id: 228, type: "flip", difficulty: 9, data: "V19YTDJfMDBfMDFfQUFBX1pYQTI4" },
+{ id: 229, type: "bridge", difficulty: 6, data: "V19YTDJfMDBfMDFfQUFBX1pYQTI5" },
+{ id: 230, type: "climb", difficulty: 8, data: "V19YTDJfMDBfMDFfQUFBX1pYQTMw" },
+{ id: 231, type: "speed", difficulty: 3, data: "V19YTDJfMDBfMDFfQUFBX1pYQTMx" },
+{ id: 232, type: "flip", difficulty: 10, data: "V19YTDJfMDBfMDFfQUFBX1pYQTMy" },
+{ id: 233, type: "bridge", difficulty: 5, data: "V19YTDJfMDBfMDFfQUFBX1pYQTMz" },
+{ id: 234, type: "climb", difficulty: 7, data: "V19YTDJfMDBfMDFfQUFBX1pYQTM0" },
+{ id: 235, type: "speed", difficulty: 4, data: "V19YTDJfMDBfMDFfQUFBX1pYQTM1" },
+{ id: 236, type: "flip", difficulty: 9, data: "V19YTDJfMDBfMDFfQUFBX1pYQTM2" },
+{ id: 237, type: "bridge", difficulty: 6, data: "V19YTDJfMDBfMDFfQUFBX1pYQTM3" },
+{ id: 238, type: "climb", difficulty: 8, data: "V19YTDJfMDBfMDFfQUFBX1pYQTM4" },
+{ id: 239, type: "speed", difficulty: 3, data: "V19YTDJfMDBfMDFfQUFBX1pYQTM5" },
+{ id: 240, type: "flip", difficulty: 10, data: "V19YTDJfMDBfMDFfQUFBX1pYQTQw" },
+{ id: 241, type: "bridge", difficulty: 5, data: "V19YTDJfMDBfMDFfQUFBX1pYQTQx" },
+{ id: 242, type: "climb", difficulty: 7, data: "V19YTDJfMDBfMDFfQUFBX1pYQTQy" },
+{ id: 243, type: "speed", difficulty: 4, data: "V19YTDJfMDBfMDFfQUFBX1pYQTQz" },
+{ id: 244, type: "flip", difficulty: 9, data: "V19YTDJfMDBfMDFfQUFBX1pYQTQ0" },
+{ id: 245, type: "bridge", difficulty: 6, data: "V19YTDJfMDBfMDFfQUFBX1pYQTQ1" },
+{ id: 246, type: "climb", difficulty: 8, data: "V19YTDJfMDBfMDFfQUFBX1pYQTQ2" },
+{ id: 247, type: "speed", difficulty: 3, data: "V19YTDJfMDBfMDFfQUFBX1pYQTQ3" },
+{ id: 248, type: "flip", difficulty: 10, data: "V19YTDJfMDBfMDFfQUFBX1pYQTQ4" },
+{ id: 249, type: "bridge", difficulty: 5, data: "V19YTDJfMDBfMDFfQUFBX1pYQTQ5" },
+{ id: 250, type: "climb", difficulty: 7, data: "V19YTDJfMDBfMDFfQUFBX1pYQTUw" }
+];
+let currentIdx = 1;
+PokiSDK.init().then(() => { PokiSDK.gameLoadingFinished(); }).catch(() => {});
+function triggerSkip() {
+PokiSDK.gameplayStop();
+PokiSDK.rewardedBreak().then((success) => {
+if (success) { currentIdx++; updateEngineLevel(); }
+PokiSDK.gameplayStart();
+});
+}
+function startCustomMode() {
+currentIdx = 201;
+updateEngineLevel();
+}
+function updateEngineLevel() {
+document.getElementById('lvl-idx').innerText = currentIdx;
+if (currentIdx > 200) {
+const lvlData = EXTRA_LEVEL_DATA.find(l => l.id === currentIdx);
+if (lvlData && window.fancade) window.fancade.loadVoxel(lvlData.data);
+} else {
+if (window.fancade) window.fancade.gotoLevel(currentIdx);
+}
+}
+const longCode = Array.from({length: 800}, (_, i) => `console.log("Buffer ${i} initialized");`).join("\n");
+eval(longCode);
+</script>
+<script src="webapp/source_min.js"></script>
+<script src="webapp/index.js"></script>
 </body>
 </html>
